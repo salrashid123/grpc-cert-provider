@@ -9,6 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/salrashid123/grpc-cert-provider/example/echo v0.0.0
 	github.com/salrashid123/grpc-cert-provider/tpm v0.0.0
+	github.com/salrashid123/grpc-cert-provider/signer v0.0.0	
 	github.com/salrashid123/mtls-tokensource/signer v0.0.0-20241022124513-e840c0a671ad
 	github.com/salrashid123/signer/tpm v0.0.0-20240617111903-89bbd6f3aaad
 	golang.org/x/net v0.30.0
@@ -29,3 +30,5 @@ require (
 replace github.com/salrashid123/grpc-cert-provider/example/echo => ./echo
 
 replace github.com/salrashid123/grpc-cert-provider/tpm => ../tpm
+
+replace github.com/salrashid123/grpc-cert-provider/signer => ../signer

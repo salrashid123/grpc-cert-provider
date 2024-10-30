@@ -8,37 +8,40 @@ This utility reads PEM encoded TPM Key files as described [here](https://github.
 
 ```bash
 $ cat workload1.pem
-		-----BEGIN TSS2 PRIVATE KEY-----
-		MIHyBgZngQUKAQOgAwEB/wIEQAAAAQRaAFgAIwALAAQAcgAAABAAGAALAAMAEAAg
-		vyhagIueIzc/zlj/6AcYPdwERNqgXHeuOZCQlap+n/QAIOnU2Eeo3BXHxqzkPwTh
-		tzb4o4C1/sDp8WXw5ixIjS2pBIGAAH4AIBiwkm4ibJPDDjaSZo5oze679FVuZInF
-		d4twjiIeeqjIABB5LRYnQ9VhknWWI+dENozEQ7welfm37mq3GofYDXXDCSfoEE8X
-		7c7X8zqONRUOwhY8nSGwql+mDMwZOc2k5rAg6ZWkrs1YkNXhuLhK1P9uvmuv6m5L
-		PkkfpCY=
-		-----END TSS2 PRIVATE KEY-----
+	-----BEGIN TSS2 PRIVATE KEY-----
+	MIHyBgZngQUKAQOgAwEB/wIEQAAAAQRaAFgAIwALAAQAcgAAABAAGAALAAMAEAAg
+	vyhagIueIzc/zlj/6AcYPdwERNqgXHeuOZCQlap+n/QAIOnU2Eeo3BXHxqzkPwTh
+	tzb4o4C1/sDp8WXw5ixIjS2pBIGAAH4AIBiwkm4ibJPDDjaSZo5oze679FVuZInF
+	d4twjiIeeqjIABB5LRYnQ9VhknWWI+dENozEQ7welfm37mq3GofYDXXDCSfoEE8X
+	7c7X8zqONRUOwhY8nSGwql+mDMwZOc2k5rAg6ZWkrs1YkNXhuLhK1P9uvmuv6m5L
+	PkkfpCY=
+	-----END TSS2 PRIVATE KEY-----
 
 $ openssl ec -provider tpm2  -provider default -in workload1.pem  --text
-		read EC key
-		Private-Key: (EC P-256, TPM 2.0)
-		Parent: 0x40000001
-		pub:
-			04:bf:28:5a:80:8b:9e:23:37:3f:ce:58:ff:e8:07:
-			18:3d:dc:04:44:da:a0:5c:77:ae:39:90:90:95:aa:
-			7e:9f:f4:e9:d4:d8:47:a8:dc:15:c7:c6:ac:e4:3f:
-			04:e1:b7:36:f8:a3:80:b5:fe:c0:e9:f1:65:f0:e6:
-			2c:48:8d:2d:a9
-		ASN1 OID: prime256v1
-		Object Attributes:
-		fixedTPM
-		fixedParent
-		sensitiveDataOrigin
-		userWithAuth
-		sign / encrypt
+	read EC key
+	Private-Key: (EC P-256, TPM 2.0)
+	Parent: 0x40000001
+	pub:
+		04:bf:28:5a:80:8b:9e:23:37:3f:ce:58:ff:e8:07:
+		18:3d:dc:04:44:da:a0:5c:77:ae:39:90:90:95:aa:
+		7e:9f:f4:e9:d4:d8:47:a8:dc:15:c7:c6:ac:e4:3f:
+		04:e1:b7:36:f8:a3:80:b5:fe:c0:e9:f1:65:f0:e6:
+		2c:48:8d:2d:a9
+	ASN1 OID: prime256v1
+	Object Attributes:
+	fixedTPM
+	fixedParent
+	sensitiveDataOrigin
+	userWithAuth
+	sign / encrypt
 ```
 
-TODO: provider support `PKCS-11` and `crypto.Signer` (eg see [golang-jwt-pkcs11](https://github.com/salrashid123/golang-jwt-pkcs11) and [golang-jwt-signer](https://github.com/salrashid123/golang-jwt-signer))
-
 >> NOTE: this repo is _not_ supported by google
+
+This repo also supports using mTLS when supplied by an arbitrary `crypto.Signer` (eg see [golang-jwt-pkcs11](https://github.com/salrashid123/golang-jwt-pkcs11) and [golang-jwt-signer](https://github.com/salrashid123/golang-jwt-signer)).  TODO is to support PKCS-11 directly (vs indirectly through a signer)
+
+
+---
 
 Basic usage comes in two forms:
 
@@ -145,10 +148,10 @@ import (
 			Certificates: []tls.Certificate{tcrt},
 		},
 	}
-    // create an advancedTLS creds (clientcreds here)
+	// create an advancedTLS creds (clientcreds here)
 	ce, err := advancedtls.NewClientCreds(options)
 
-    // create a connection
+	// create a connection
 	conn, err := grpc.NewClient(*address, grpc.WithTransportCredentials(ce))
 ```
 
@@ -214,6 +217,92 @@ go run client_tpm_provider/grpc_client.go \
     --tlsCert=ca_scratchpad/certs/workload1.crt \
     --tlsKey=ca_scratchpad/certs/workload1.pem  \
     --tpm-path="127.0.0.1:2321"    
+```
+
+
+#### Using crypto.Signer
+
+This repo also contains a handler for an arbitrary `crypto.Signer` (eg, KMS, PKCS-11, Yubikey, even regular PEM private keys)
+
+With this, you can use anything that implements that interface for mtls.  The example in this repo uses a simple private RSA key and converts it to a crypto.Signer
+
+* `A)`:  `IdentityOptions.IdentityProvider`
+
+ in the following example, a simple EC key implements a `crypto.Signer
+
+* `"github.com/salrashid123/grpc-cert-provider/signer"`
+
+```golang
+import (
+	signerfile "github.com/salrashid123/grpc-cert-provider/signer"
+)
+	// read private key
+	privatePEM, err := os.ReadFile(*tlsKey)
+
+	rblock, _ := pem.Decode(privatePEM)
+	rk, err := x509.ParsePKCS8PrivateKey(rblock.Bytes)
+
+	// set the options;  note the private key is cast to crypto.Signer
+	identityOptions := signerfile.Options{
+		CertFile: *tlsCert,
+		Signer:   rk.(crypto.Signer),
+	}
+	identityProvider, err := signerfile.NewProvider(identityOptions)
+
+	options := &advancedtls.Options{
+		IdentityOptions: advancedtls.IdentityCertificateOptions{
+			IdentityProvider: identityProvider,
+		},
+	}
+	ce, err := advancedtls.NewClientCreds(options)
+
+```
+
+run as
+
+```bash
+go run client_signer_provider/grpc_client.go \
+    --host 127.0.0.1:50051 \
+    --rootCA=ca_scratchpad/ca/root-ca.crt \
+    --servername=grpc.domain.com \
+    --tlsCert=ca_scratchpad/certs/client.crt \
+    --tlsKey=ca_scratchpad/certs/client.key 
+```
+
+* `B)`:  `IdentityOptions.Certificates`
+
+With this, you supply the private key directly to a generic signer
+
+```golang
+	privatePEM, err := os.ReadFile(*tlsKey)
+
+	rblock, _ := pem.Decode(privatePEM)
+	rk, err := x509.ParsePKCS8PrivateKey(rblock.Bytes)
+
+	rs, err := genericsigner.NewGenericSignerTLS(&genericsigner.GenericSignerTLS{
+		Signer:              rk.(crypto.Signer),
+		MtlsCertificateFile: *tlsCert,
+	})
+
+	tcrt, err := rs.TLSCertificate()
+
+	options := &advancedtls.Options{
+		IdentityOptions: advancedtls.IdentityCertificateOptions{
+			Certificates: []tls.Certificate{tcrt},
+		},
+	}
+	ce, err := advancedtls.NewClientCreds(options)
+```
+
+run as
+
+```bash
+go run client_signer_direct/grpc_client.go \
+    --host 127.0.0.1:50051 \
+    --rootCA=ca_scratchpad/ca/root-ca.crt \
+    --servername=grpc.domain.com \
+    --tlsCert=ca_scratchpad/certs/client.crt \
+    --tlsKey=ca_scratchpad/certs/client.key 
 ```
 
 #### Appendix
