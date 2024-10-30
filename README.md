@@ -8,34 +8,32 @@ This utility reads PEM encoded TPM Key files as described [here](https://github.
 
 ```bash
 $ cat workload1.pem
-
------BEGIN TSS2 PRIVATE KEY-----
-MIHyBgZngQUKAQOgAwEB/wIEQAAAAQRaAFgAIwALAAQAcgAAABAAGAALAAMAEAAg
-vyhagIueIzc/zlj/6AcYPdwERNqgXHeuOZCQlap+n/QAIOnU2Eeo3BXHxqzkPwTh
-tzb4o4C1/sDp8WXw5ixIjS2pBIGAAH4AIBiwkm4ibJPDDjaSZo5oze679FVuZInF
-d4twjiIeeqjIABB5LRYnQ9VhknWWI+dENozEQ7welfm37mq3GofYDXXDCSfoEE8X
-7c7X8zqONRUOwhY8nSGwql+mDMwZOc2k5rAg6ZWkrs1YkNXhuLhK1P9uvmuv6m5L
-PkkfpCY=
------END TSS2 PRIVATE KEY-----
+		-----BEGIN TSS2 PRIVATE KEY-----
+		MIHyBgZngQUKAQOgAwEB/wIEQAAAAQRaAFgAIwALAAQAcgAAABAAGAALAAMAEAAg
+		vyhagIueIzc/zlj/6AcYPdwERNqgXHeuOZCQlap+n/QAIOnU2Eeo3BXHxqzkPwTh
+		tzb4o4C1/sDp8WXw5ixIjS2pBIGAAH4AIBiwkm4ibJPDDjaSZo5oze679FVuZInF
+		d4twjiIeeqjIABB5LRYnQ9VhknWWI+dENozEQ7welfm37mq3GofYDXXDCSfoEE8X
+		7c7X8zqONRUOwhY8nSGwql+mDMwZOc2k5rAg6ZWkrs1YkNXhuLhK1P9uvmuv6m5L
+		PkkfpCY=
+		-----END TSS2 PRIVATE KEY-----
 
 $ openssl ec -provider tpm2  -provider default -in workload1.pem  --text
-
-read EC key
-Private-Key: (EC P-256, TPM 2.0)
-Parent: 0x40000001
-pub:
-    04:bf:28:5a:80:8b:9e:23:37:3f:ce:58:ff:e8:07:
-    18:3d:dc:04:44:da:a0:5c:77:ae:39:90:90:95:aa:
-    7e:9f:f4:e9:d4:d8:47:a8:dc:15:c7:c6:ac:e4:3f:
-    04:e1:b7:36:f8:a3:80:b5:fe:c0:e9:f1:65:f0:e6:
-    2c:48:8d:2d:a9
-ASN1 OID: prime256v1
-Object Attributes:
-  fixedTPM
-  fixedParent
-  sensitiveDataOrigin
-  userWithAuth
-  sign / encrypt
+		read EC key
+		Private-Key: (EC P-256, TPM 2.0)
+		Parent: 0x40000001
+		pub:
+			04:bf:28:5a:80:8b:9e:23:37:3f:ce:58:ff:e8:07:
+			18:3d:dc:04:44:da:a0:5c:77:ae:39:90:90:95:aa:
+			7e:9f:f4:e9:d4:d8:47:a8:dc:15:c7:c6:ac:e4:3f:
+			04:e1:b7:36:f8:a3:80:b5:fe:c0:e9:f1:65:f0:e6:
+			2c:48:8d:2d:a9
+		ASN1 OID: prime256v1
+		Object Attributes:
+		fixedTPM
+		fixedParent
+		sensitiveDataOrigin
+		userWithAuth
+		sign / encrypt
 ```
 
 TODO: provider support `PKCS-11` and `crypto.Signer` (eg see [golang-jwt-pkcs11](https://github.com/salrashid123/golang-jwt-pkcs11) and [golang-jwt-signer](https://github.com/salrashid123/golang-jwt-signer))
@@ -44,70 +42,8 @@ TODO: provider support `PKCS-11` and `crypto.Signer` (eg see [golang-jwt-pkcs11]
 
 Basic usage comes in two forms:
 
-* `A)`:  `IdentityOptions.Certificates`
 
-With this you need to acquire the TPM based certificate directly before initializing an `advancedtls` module
-
-```golang
-import (
-	genericsigner "github.com/salrashid123/mtls-tokensource/signer"
-	tpmsigner "github.com/salrashid123/signer/tpm"
-)
-	// open the tpm
-	rwc, err := openTPM(*tpmPath)
-	defer rwc.Close()
-	// get a reader
-	rwr := transport.FromReadWriter(rwc)
-
-	// read a TPM private key
-	c, err := os.ReadFile(*tlsKey)
-	key, err := keyfile.Decode(c)
-
-	//  Load the key object
-	regenRSAKey, err := tpm2.Load{
-		ParentHandle: tpm2.AuthHandle{
-			Handle: primary.ObjectHandle,
-			Name:   tpm2.TPM2BName(primary.Name),
-			Auth:   tpm2.PasswordAuth(nil),
-		},
-		InPublic:  key.Pubkey,
-		InPrivate: key.Privkey,
-	}.Execute(rwr)
-
-
-	// load a TPM basic crypto.Signer
-	tsigner, err := tpmsigner.NewTPMCrypto(&tpmsigner.TPM{
-		TpmDevice: rwc,
-		NamedHandle: &tpm2.NamedHandle{
-			Handle: regenRSAKey.ObjectHandle,
-			Name:   regenRSAKey.Name,
-		},
-		PublicCertFile: *tlsCert,
-	})
-
-	// use the signer and apply the public x509 for use in TLS sessions
-	rs, err := genericsigner.NewGenericSignerTLS(&genericsigner.GenericSignerTLS{
-		Signer:              tsigner,
-		MtlsCertificateFile: *tlsCert,
-	})
-
-	// get the TLS certificate which includes the TPM signer
-	tcrt, err := rs.TLSCertificate()
-
-	// apply the certificate as an IdentityOption
-	options := &advancedtls.Options{
-		IdentityOptions: advancedtls.IdentityCertificateOptions{
-			Certificates: []tls.Certificate{tcrt},
-		},
-	}
-    // create an advancedTLS creds (clientcreds here)
-	ce, err := advancedtls.NewClientCreds(options)
-
-    // create a connection
-	conn, err := grpc.NewClient(*address, grpc.WithTransportCredentials(ce))
-```
-
-* `B)`:  `IdentityOptions.IdentityProvider`
+* `A)`:  `IdentityOptions.IdentityProvider`
 
 With this you need to acquire the TPM based certificate directly before initializing an advancedtls module
 
@@ -144,6 +80,76 @@ import (
 
 	// remember to close the tpm
 	rwc.Close()
+```
+
+* `B)`:  `IdentityOptions.Certificates`
+
+With this you need to acquire the TPM based certificate directly before initializing an `advancedtls` module
+
+```golang
+import (
+	genericsigner "github.com/salrashid123/mtls-tokensource/signer"
+	tpmsigner "github.com/salrashid123/signer/tpm"
+	keyfile "github.com/foxboron/go-tpm-keyfiles"
+)
+	// open the tpm
+	rwc, err := openTPM(*tpmPath)
+	defer rwc.Close()
+	// get a reader
+	rwr := transport.FromReadWriter(rwc)
+
+	// read a TPM private key
+	c, err := os.ReadFile(*tlsKey)
+	key, err := keyfile.Decode(c)
+
+	// acquire the H2 Primary key
+	primary, err := tpm2.CreatePrimary{
+		PrimaryHandle: tpm2.TPMRHOwner,
+		InPublic:      tpm2.New2B(keyfile.ECCSRK_H2_Template),
+	}.Execute(rwr)	
+
+	//  Load the actual key object
+	regenRSAKey, err := tpm2.Load{
+		ParentHandle: tpm2.AuthHandle{
+			Handle: primary.ObjectHandle,
+			Name:   tpm2.TPM2BName(primary.Name),
+			Auth:   tpm2.PasswordAuth(nil),
+		},
+		InPublic:  key.Pubkey,
+		InPrivate: key.Privkey,
+	}.Execute(rwr)
+
+
+	// generate a TPM basic crypto.Signer
+	tsigner, err := tpmsigner.NewTPMCrypto(&tpmsigner.TPM{
+		TpmDevice: rwc,
+		NamedHandle: &tpm2.NamedHandle{
+			Handle: regenRSAKey.ObjectHandle,
+			Name:   regenRSAKey.Name,
+		},
+		PublicCertFile: *tlsCert,
+	})
+
+	// use the signer and apply the public x509 for use in TLS sessions
+	rs, err := genericsigner.NewGenericSignerTLS(&genericsigner.GenericSignerTLS{
+		Signer:              tsigner,
+		MtlsCertificateFile: *tlsCert,
+	})
+
+	// get the TLS certificate which includes the TPM signer
+	tcrt, err := rs.TLSCertificate()
+
+	// apply the certificate as an IdentityOption
+	options := &advancedtls.Options{
+		IdentityOptions: advancedtls.IdentityCertificateOptions{
+			Certificates: []tls.Certificate{tcrt},
+		},
+	}
+    // create an advancedTLS creds (clientcreds here)
+	ce, err := advancedtls.NewClientCreds(options)
+
+    // create a connection
+	conn, err := grpc.NewClient(*address, grpc.WithTransportCredentials(ce))
 ```
 
 ---
