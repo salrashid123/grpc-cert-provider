@@ -57,7 +57,6 @@ the specific implementation here is loaded using
 ```golang
 import (
 	tpmfile "github.com/salrashid123/grpc-cert-provider/tpm"
-	tpmsigner "github.com/salrashid123/signer/tpm"
 )
 	// open tpm
 	rwc, err := openTPM(*tpmPath)
