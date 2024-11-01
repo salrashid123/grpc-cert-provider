@@ -48,7 +48,7 @@ Basic usage comes in two forms:
 
 * `A)`:  `IdentityOptions.IdentityProvider`
 
-With this you need to acquire the TPM based certificate directly before initializing an advancedtls module
+With this, simply provide the basic tpm-based key and initialize the advancedtls module.
 
 the specific implementation here is loaded using
 
@@ -86,7 +86,9 @@ import (
 
 * `B)`:  `IdentityOptions.Certificates`
 
-With this you need to acquire the TPM based certificate directly before initializing an `advancedtls` module
+With this you need to acquire the TPM based certificate directly before initializing an `advancedtls` module.
+
+The specific advantage of this mechanism is that you can define any authoriztion policy through the [tpmsigner](https://github.com/salrashid123/signer/tree/master/example)
 
 ```golang
 import (
