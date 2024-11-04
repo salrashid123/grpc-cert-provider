@@ -1,4 +1,4 @@
-## gRPC AdvancdTLS provider packages for Trusted Platform Module
+## gRPC AdvancedTLS provider packages for Trusted Platform Module
 
 Implementation for gRPC go's [grpc.security.advancedtls](https://pkg.go.dev/google.golang.org/grpc/security/advancedtls) handlers.
 
